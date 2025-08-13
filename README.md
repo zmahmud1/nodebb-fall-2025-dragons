@@ -1,5 +1,7 @@
 # ![NodeBB](public/images/sm-card.png)
 
+![Team Contribution Summary](https://raw.githubusercontent.com/CMU-313/NodeBB/gittogether-svg/activity.svg)
+
 [![Workflow](https://github.com/NodeBB/NodeBB/actions/workflows/test.yaml/badge.svg)](https://github.com/NodeBB/NodeBB/actions/workflows/test.yaml)
 [![Coverage Status](https://coveralls.io/repos/github/NodeBB/NodeBB/badge.svg?branch=master)](https://coveralls.io/github/NodeBB/NodeBB?branch=master)
 [![Code Climate](https://codeclimate.com/github/NodeBB/NodeBB/badges/gpa.svg)](https://codeclimate.com/github/NodeBB/NodeBB)
