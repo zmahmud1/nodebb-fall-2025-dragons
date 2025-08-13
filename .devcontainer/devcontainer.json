@@ -5,7 +5,7 @@
     "build": {
         "dockerfile": "Dockerfile"
     },
-    "postCreateCommand": "redis-server --daemonize yes",
+    "postCreateCommand": "redis-server --daemonize yes && ./nodebb setup",
     "customizations": {
         "vscode": {
             "extensions": [
