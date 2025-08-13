@@ -1,0 +1,17 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/javascript-node
+{
+    "name": "NodeBB",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "postCreateCommand": "redis-server --daemonize yes",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.live-server",
+                "redis.redis-for-vscode"
+            ]
+        }
+    }
+}
