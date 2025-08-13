@@ -6,6 +6,15 @@
         "dockerfile": "Dockerfile"
     },
     "postCreateCommand": "redis-server --daemonize yes && ./nodebb setup && npm install",
+    "postStartCommand": "redis-server --daemonize yes || true",
+
+    "forwardPorts": [4567],
+    "portsAttributes": {
+        "4567": {
+            "label": "NodeBB"
+        }
+    },
+
     "customizations": {
         "vscode": {
             "extensions": [
