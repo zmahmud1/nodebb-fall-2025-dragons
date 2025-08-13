@@ -1,3 +1,5 @@
+dump.rdb
+
 dist/
 yarn.lock
 npm-debug.log
