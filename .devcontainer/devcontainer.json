@@ -5,7 +5,7 @@
     "build": {
         "dockerfile": "Dockerfile"
     },
-    "postCreateCommand": "redis-server --daemonize yes && ./nodebb setup && npm install",
+    "postCreateCommand": "redis-server --daemonize yes",
     "postStartCommand": "redis-server --daemonize yes || true",
 
     "forwardPorts": [4567],
