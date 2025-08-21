@@ -18,6 +18,7 @@
     "customizations": {
         "vscode": {
             "extensions": [
+                "42crunch.vscode-openapi",
                 "ms-vscode.live-server",
                 "redis.redis-for-vscode"
             ]
