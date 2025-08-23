@@ -7,9 +7,9 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "NodeBB: dev (launch)",
-      "program": "${workspaceFolder}/nodebb",
-      "args": ["dev"],
+      "name": "NodeBB: loader (no-daemon)",
+      "program": "${workspaceFolder}/loader.js",
+      "args": ["--no-daemon", "--no-silent"],
       "cwd": "${workspaceFolder}",
       "env": { "NODE_ENV": "development" },
       "console": "integratedTerminal",
