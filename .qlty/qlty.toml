@@ -1,0 +1,34 @@
+config_version = "0"
+
+include_patterns = ["src/**/*.js", "public/src/**/*.js"]
+exclude_patterns = ["**/node_modules/**", "**/build/**", "**/coverage/**", "**/public/**/*.min.*", "**/dist/**"]
+
+[checks]
+mode = "comment"
+
+[smells.function_parameters]
+threshold = 4
+
+[smells.function_complexity]
+threshold = 10
+
+[smells.file_complexity]
+threshold = 50
+
+[smells.nesting]
+threshold = 5
+
+[smells.boolean_logic]
+threshold = 4
+
+[smells.identical_code]
+enabled = true
+min_tokens = 60
+
+[smells.similar_code]
+enabled = true
+min_tokens = 80
+
+[[source]]
+name = "default"
+default = true

@@ -1,0 +1,18 @@
+name: gittogether
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  summary:
+    uses: ChrisTimperley/GitTogether-Action/.github/workflows/gittogether.yml@main
+    with:
+      release_repo: ChrisTimperley/GitTogether
+      config: .gittogether.yml
+      output_svg: activity.svg
+      branch: gittogether-svg
+      style: compact
