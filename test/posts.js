@@ -29,6 +29,7 @@ describe('Post\'s', () => {
 	let voterUid;
 	let voteeUid;
 	let globalModUid;
+	let adminUid;
 	let postData;
 	let topicData;
 	let cid;
@@ -49,6 +50,8 @@ describe('Post\'s', () => {
 			content: 'The content of test topic',
 		}));
 		await groups.join('Global Moderators', globalModUid);
+		adminUid = await user.create({ username: 'adminpin' });
+		await groups.join('administrators', adminUid);
 	});
 
 	it('should update category teaser properly', async () => {
@@ -278,6 +281,37 @@ describe('Post\'s', () => {
 			assert.equal(data.isBookmarked, false);
 			const hasBookmarked = await posts.hasBookmarked([postData.pid], voterUid);
 			assert.equal(hasBookmarked[0], false);
+		});
+	});
+
+	describe('pin/unpin', () => {
+		it('should not allow non-admin to pin a post', async () => {
+			await assert.rejects(
+				apiPosts.pin({ uid: voterUid }, { pid: postData.pid }),
+				{ message: '[[error:no-privileges]]' },
+			);
+		});
+
+		it('should pin a post as admin', async () => {
+			await apiPosts.pin({ uid: adminUid }, { pid: postData.pid });
+			const pinned = await posts.getPostField(postData.pid, 'pinned');
+			assert.strictEqual(pinned, 1);
+			// optional zset membership check
+			const score = await db.sortedSetScore(`tid:${topicData.tid}:pids:pinned`, String(postData.pid));
+			assert(utils.isNumber(score));
+		});
+
+		it('should unpin a post as admin', async () => {
+			await apiPosts.unpin({ uid: adminUid }, { pid: postData.pid });
+			const pinned = await posts.getPostField(postData.pid, 'pinned');
+			assert.strictEqual(pinned, 0);
+		});
+
+		it('should error on non-existent post id', async () => {
+			await assert.rejects(
+				apiPosts.pin({ uid: adminUid }, { pid: 987654321 }),
+				{ message: '[[error:no-post]]' },
+			);
 		});
 	});
 

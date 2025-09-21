@@ -188,6 +188,38 @@ postsAPI.restore = async function (caller, data) {
 	});
 };
 
+postsAPI.pin = async function (caller, data) {
+	if (!data || !data.pid) {
+		throw new Error('[[error:invalid-data]]');
+	}
+	const post = await posts.tools.pin(caller.uid, data.pid);
+	websockets.in(`topic_${post.tid}`).emit('event:post_pinned', post);
+	await events.log({
+		type: 'post-pin',
+		uid: caller.uid,
+		pid: data.pid,
+		tid: post.tid,
+		ip: caller.ip,
+	});
+	return post;
+};
+
+postsAPI.unpin = async function (caller, data) {
+	if (!data || !data.pid) {
+		throw new Error('[[error:invalid-data]]');
+	}
+	const post = await posts.tools.unpin(caller.uid, data.pid);
+	websockets.in(`topic_${post.tid}`).emit('event:post_unpinned', post);
+	await events.log({
+		type: 'post-unpin',
+		uid: caller.uid,
+		pid: data.pid,
+		tid: post.tid,
+		ip: caller.ip,
+	});
+	return post;
+};
+
 async function deleteOrRestore(caller, data, params) {
 	if (!data || !data.pid) {
 		throw new Error('[[error:invalid-data]]');

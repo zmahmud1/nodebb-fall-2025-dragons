@@ -1,6 +1,8 @@
 PostObject:
   description: A single post in the array returned from `Posts.getPostSummaryByPids`
   type: object
+  required:
+    - pid
   properties:
     pid:
       type: number
@@ -34,6 +36,9 @@ PostObject:
       type: number
     votes:
       type: number
+    pinned:
+      type: number
+      description: Whether the post is pinned (1) or not (0)
     timestampISO:
       type: string
       description: An ISO 8601 formatted date string (complementing `timestamp`)
@@ -174,6 +179,9 @@ PostDataObject:
           type: number
         votes:
           type: number
+        pinned:
+          type: number
+          description: Whether the post is pinned (1) or not (0)
         deleted:
           type: number
         upvotes:

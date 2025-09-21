@@ -34,6 +34,10 @@ module.exports = function () {
 	setupApiRoute(router, 'put', '/:pid/bookmark', middlewares, controllers.write.posts.bookmark);
 	setupApiRoute(router, 'delete', '/:pid/bookmark', middlewares, controllers.write.posts.unbookmark);
 
+	// Pin/unpin post (admin-only enforced in API)
+	setupApiRoute(router, 'put', '/:pid/pin', [middleware.ensureLoggedIn, middleware.assert.post], controllers.write.posts.pin);
+	setupApiRoute(router, 'delete', '/:pid/pin', [middleware.ensureLoggedIn, middleware.assert.post], controllers.write.posts.unpin);
+
 	setupApiRoute(router, 'get', '/:pid/diffs', [middleware.assert.post], controllers.write.posts.getDiffs);
 	setupApiRoute(router, 'get', '/:pid/diffs/:since', [middleware.assert.post], controllers.write.posts.loadDiff);
 	setupApiRoute(router, 'put', '/:pid/diffs/:since', middlewares, controllers.write.posts.restoreDiff);
