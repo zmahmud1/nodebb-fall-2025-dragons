@@ -111,7 +111,7 @@ module.exports = function (SocketPosts) {
 		if (!data || !data.pid) {
 			throw new Error('[[error:invalid-data]]');
 		}
-		const pid = data.pid;
+		const {pid} = data;
 		// enforce same privilege as flagging (visibility driven by canFlag)
 		const canFlag = await privileges.posts.canFlag(pid, socket.uid);
 		if (!canFlag || !canFlag.flag) {
@@ -122,6 +122,13 @@ module.exports = function (SocketPosts) {
 		const tid = await posts.getPostField(pid, 'tid');
 		const current = await posts.getPostField(pid, 'answered');
 		const newVal = !parseInt(current, 10);
+
+		// Debug: log the toggle attempt for diagnosis
+		try {
+			console.log('[posts.toggleAnswered] pid=%s current=%s newVal=%s uid=%s', pid, current, newVal, socket && socket.uid);
+		} catch (e) {
+			// ignore logging errors
+		}
 		// If Posts.answered helper exists, use it. Otherwise fall back to direct DB ops.
 		if (posts.answered && typeof posts.answered.set === 'function') {
 			await posts.answered.set(pid, newVal);
@@ -129,6 +136,11 @@ module.exports = function (SocketPosts) {
 			// fallback: set post field and update sorted sets
 			const tid = await posts.getPostField(pid, 'tid');
 			await posts.setPostField(pid, 'answered', newVal ? 1 : 0);
+			try {
+				console.log('[posts.toggleAnswered] persisted fallback set post:%s.answered=%s', pid, newVal ? 1 : 0);
+			} catch (e) {
+				// ignore
+			}
 			if (newVal) {
 				const score = Date.now();
 				await db.sortedSetAdd('posts:answered', score, pid);
@@ -142,7 +154,25 @@ module.exports = function (SocketPosts) {
 		// notify topic room so other clients can update in realtime
 		try {
 			if (tid) {
-				websockets.in(`topic_${tid}`).emit('event:post_answered', { pid: pid, answered: newVal });
+				websockets.in(`topic_${tid}`).emit('event:post_answered', { pid: pid, answered: newVal, tid });
+				try { console.log('[posts.toggleAnswered] emitted event:post_answered to topic_%s payload=%j', tid, { pid: pid, answered: newVal, tid }); } catch (e) {}
+			}
+			// Also emit to the category room so category lists can update in realtime
+			try {
+				const cid = await posts.getCidByPid(pid);
+				if (cid) {
+					websockets.in(`category_${cid}`).emit('event:post_answered', { pid: pid, answered: newVal, tid, cid });
+					try { console.log('[posts.toggleAnswered] emitted event:post_answered to category_%s payload=%j', cid, { pid: pid, answered: newVal, tid, cid }); } catch (e) {}
+				}
+			} catch (e) {
+				// non-fatal
+			}
+
+			// Fire plugin hook for answered state change
+			try {
+				await plugins.hooks.fire('action:post.answered', { pid, answered: newVal, tid, uid: socket.uid });
+			} catch (e) {
+				// non-fatal
 			}
 		} catch (e) {
 			// non-fatal

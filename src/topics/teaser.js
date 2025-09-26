@@ -36,17 +36,80 @@ module.exports = function (Topics) {
 					teaserPids.push(topic.mainPid);
 				} else if (teaserPost === 'last-post') {
 					teaserPids.push(topic.teaserPid || topic.mainPid);
-				} else { // last-reply and everything else uses teaserPid like `last` that was used before
-					teaserPids.push(topic.teaserPid);
+				} else {
+					// last-reply and everything else:
+					// prefer teaserPid, fallback to mainPid
+					teaserPids.push(topic.teaserPid || topic.mainPid);
 				}
 			}
 		});
 
+		// If any teaserPids are falsy (both teaserPid and mainPid missing),
+		// try to fetch the latest undeleted reply for those topics
+		const missing = [];
+		teaserPids.forEach((pid, i) => {
+			if (!pid) {
+				const tid = topics[i] && topics[i].tid;
+				if (tid) {
+					missing.push({ idx: i, tid });
+				}
+			}
+		});
+		if (missing.length) {
+			const missingPromises = missing.map(m =>
+				Topics.getLatestUndeletedReply(m.tid)
+					.then(pid => ({ idx: m.idx, pid: pid || null })));
+			const resolved = await Promise.all(missingPromises);
+			resolved.forEach((r) => {
+				teaserPids[r.idx] = r.pid;
+			});
+		}
+
+		// Filter out falsy/invalid teaser PIDs to avoid requesting non-existent post keys
+		// Coerce to integers and only allow positive numeric PIDs, deduplicate.
+		const validTeaserPids = _.uniq(teaserPids
+			.map(pid => parseInt(pid, 10))
+			.filter(pid => utils.isNumber(pid) && pid > 0));
+		// Extra debug: log the raw teaser PIDs and the valid set when things go wrong.
+		try {
+			const topicTids = topics.map(t => (t && t.tid));
+			console.log(
+				'[Topics.getTeasers] teaserPids=%j validTeaserPids=%j topicTids=%j',
+				teaserPids,
+				validTeaserPids,
+				topicTids
+			);
+		} catch (e) {
+			// ignore logging errors
+		}
+
+		// Include the `answered` field so topic teasers can show an ANSWERED badge in lists
 		const [allPostData, callerSettings] = await Promise.all([
-			posts.getPostsFields(teaserPids, ['pid', 'uid', 'timestamp', 'tid', 'content', 'sourceContent']),
+			posts.getPostsFields(validTeaserPids, ['pid', 'uid', 'timestamp', 'tid', 'content', 'sourceContent', 'answered']),
 			user.getSettings(uid),
 		]);
 		let postData = allPostData.filter(post => post && post.pid);
+
+		// Diagnostic: if we requested zero valid teaser pids but the requested list was non-empty,
+		// log topic fields to understand why teaser/main PIDs are missing.
+		try {
+			if (validTeaserPids.length === 0 && teaserPids.length > 0) {
+				const tids = topics.map(t => (t && t.tid)).filter(Boolean);
+				if (tids.length) {
+					const topicFields = await Topics.getTopicsFields(tids, ['tid', 'mainPid', 'teaserPid', 'postcount']);
+					console.log('[Topics.getTeasers:diagnostic] topics=%j topicFields=%j', tids, topicFields);
+				}
+			}
+		} catch (e) {
+			console.error('[Topics.getTeasers:diagnostic] failed to fetch topic fields', e);
+		}
+		// Debug: log answered presence for teasers
+		try {
+			const answeredCount = postData.reduce((acc, p) => acc + (p.answered ? 1 : 0), 0);
+			console.log('[Topics.getTeasers] requested=%d validRequested=%d teasers fetched=%d answered=%d', teaserPids.length, validTeaserPids.length, postData.length, answeredCount);
+		} catch (e) {
+			// ignore
+		}
 		postData = await handleBlocks(uid, postData);
 		postData = postData.filter(Boolean);
 		const uids = _.uniq(postData.map(post => post.uid));

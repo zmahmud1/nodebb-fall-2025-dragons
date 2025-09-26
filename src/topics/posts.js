@@ -200,7 +200,8 @@ module.exports = function (Topics) {
 		const pidToPrivs = _.zipObject(parentPids, postPrivileges);
 
 		parentPids = parentPids.filter(p => pidToPrivs[p]['topics:read']);
-		const parentPosts = await posts.getPostsFields(parentPids, ['uid', 'pid', 'timestamp', 'content', 'sourceContent', 'deleted']);
+		// Include 'answered' so parent previews will render the ANSWERED badge
+		const parentPosts = await posts.getPostsFields(parentPids, ['uid', 'pid', 'timestamp', 'content', 'sourceContent', 'deleted', 'answered']);
 		const parentUids = _.uniq(parentPosts.map(postObj => postObj && postObj.uid));
 		const userData = await user.getUsersFields(parentUids, ['username', 'userslug', 'picture']);
 
@@ -219,6 +220,14 @@ module.exports = function (Topics) {
 			}
 			parentPost = await posts.parsePost(parentPost);
 		}));
+
+		// Debug: log how many parent posts include answered
+		try {
+			const parentsWithAnswered = parentPosts.filter(p => p && p.hasOwnProperty('answered')).length;
+			console.log('[Topics.addParentPosts] parentPids=%d fetched=%d withAnswered=%d', parentPids.length, parentPosts.length, parentsWithAnswered);
+		} catch (e) {
+			// ignore
+		}
 
 		const parents = {};
 		parentPosts.forEach((post, i) => {

@@ -26,6 +26,171 @@ define('topicList', [
 	});
 
 	TopicList.init = function (template, cb) {
+		// Listen for answered events so category/topic lists update live
+		socket.on('event:post_answered', function (data) {
+			try {
+				// DEBUG: Log receipt of answered events on category/topic lists
+				console.log('[topicList] socket event:post_answered received', data);
+				if (!data) return;
+				// If tid present, prefer to fetch authoritative teaser from the server
+				const tid = data.tid;
+				// Always revalidate from DB: fetch teaser by tid or post by pid and update from DB-backed state
+				if (tid) {
+					fetch(config.relative_path + '/api/topic/teaser/' + tid, { credentials: 'same-origin' })
+						.then(function (res) { if (!res.ok) throw new Error('teaser fetch failed'); return res.json(); })
+						.then(function (body) {
+							if (body && body.teaser) {
+								updateAnsweredBadgeForTopic(tid, !!body.teaser.answered);
+							}
+						})
+						.catch(function (err) {
+							console.warn('[topicList] teaser fetch failed for tid=', tid, err);
+						});
+					return;
+				} else if (data && data.pid) {
+					fetch(config.relative_path + '/api/post/' + data.pid, { credentials: 'same-origin' })
+						.then(function (res) { if (!res.ok) throw new Error('post fetch failed'); return res.json(); })
+						.then(function (body) {
+							if (body && body.post && body.post.tid) {
+								updateAnsweredBadgeForTopic(body.post.tid, !!body.post.answered);
+							}
+						})
+						.catch(function (err) {
+							console.warn('[topicList] post fetch failed for pid=', data.pid, err);
+						});
+					return;
+				}
+				let topicEl = null;
+				if (tid) {
+					// Try to find the topic list item by a data-tid attribute on the root element.
+					topicEl = topicListEl.find('[component="category/topic"][data-tid="' + tid + '"]');
+					if ((!topicEl || !topicEl.length)) {
+						// Fallback: find any element inside the topic list that has data-tid and climb up to the topic item.
+						const inner = topicListEl.find('[data-tid="' + tid + '"]');
+						if (inner && inner.length) {
+							topicEl = inner.closest('[component="category/topic"]');
+						}
+					}
+				}
+				// As a fallback, search for topic elements whose teaser had the pid in a data attribute
+				if ((!topicEl || !topicEl.length) && data.pid) {
+					// Normalize pid/string 'null' handling: some templates set data-teaser-pid to 'null' or omit it.
+					const pid = String(data.pid);
+					topicEl = topicListEl.find('[component="category/topic"]').filter(function () {
+						const attr = $(this).attr('data-teaser-pid');
+						return attr && attr === pid;
+					});
+				}
+				if (!topicEl || !topicEl.length) {
+					// If we couldn't map the event to a DOM element, re-query the server
+					// for DB-backed teaser/post state and update accordingly. This makes
+					// the badge reflect persistent DB state even when DOM attributes
+					// (data-teaser-pid) are missing or incorrect.
+					if (tid) {
+						fetch(config.relative_path + '/api/topic/teaser/' + tid, { credentials: 'same-origin' })
+							.then(function (res) { if (!res.ok) throw new Error('teaser fetch failed'); return res.json(); })
+							.then(function (body) {
+								if (body && body.teaser) {
+									updateAnsweredBadgeForTopic(tid, !!body.teaser.answered);
+								}
+							})
+							.catch(function (err) {
+								console.warn('[topicList] teaser fetch failed for tid=', tid, err);
+							});
+					} else if (data && data.pid) {
+						fetch(config.relative_path + '/api/post/' + data.pid, { credentials: 'same-origin' })
+							.then(function (res) { if (!res.ok) throw new Error('post fetch failed'); return res.json(); })
+							.then(function (body) {
+								if (body && body.post) {
+									// Try to find the topic id from the returned post and update that
+									if (body.post.tid) {
+										updateAnsweredBadgeForTopic(body.post.tid, !!body.post.answered);
+									}
+								}
+							})
+							.catch(function (err) {
+								console.warn('[topicList] post fetch failed for pid=', data.pid, err);
+							});
+					}
+					return;
+				}
+				// Diagnostic: log what we matched
+				console.log('[topicList] matched topicEl count=', (topicEl && topicEl.length) ? topicEl.length : 0, ' for tid=', tid, ' pid=', data.pid);
+				// remove any existing badges inside this topic element
+				const removed = topicEl.find('.post-answered-badge').remove();
+				console.log('[topicList] removed existing badges count=', removed ? removed.length : 0);
+				if (data.answered) {
+					// Primary: the topic labels timeago (this is the timestamp displayed next to the
+					// title). This ensures the badge appears underneath the title beside that timestamp.
+					let timeEl = topicEl.find('[component="topic/labels"] .timeago').first();
+					if (!timeEl || !timeEl.length) {
+						// Secondary: header parent area (older themes place timeago as a sibling of header)
+						const headerEl = topicEl.find('[component="topic/header"]').first();
+						if (headerEl && headerEl.length) {
+							timeEl = headerEl.parent().find('.timeago').first();
+						}
+					}
+					if (!timeEl || !timeEl.length) {
+						// Tertiary: teaser area then any timeago
+						timeEl = topicEl.find('.meta.teaser .timeago').first();
+					}
+					if (!timeEl || !timeEl.length) {
+						timeEl = topicEl.find('.timeago').first();
+					}
+					if (timeEl && timeEl.length) {
+						timeEl.after('<span class="ms-2 text-success fw-bold post-answered-badge">ANSWERED</span>');
+						console.log('[topicList] inserted badge after timeEl for tid=', tid);
+					} else if (topicEl.find('[component="topic/header"]').length) {
+						// Final fallback: append to header element
+						topicEl.find('[component="topic/header"]').append('<span class="ms-2 text-success fw-bold post-answered-badge">ANSWERED</span>');
+						console.log('[topicList] appended badge to header for tid=', tid);
+					} else {
+						// Very final fallback: append to the root topic element
+						topicEl.append('<span class="ms-2 text-success fw-bold post-answered-badge">ANSWERED</span>');
+						console.log('[topicList] appended badge to root for tid=', tid);
+					}
+				}
+
+				/**
+				 * Update badge DOM for a given tid based on answered boolean.
+				 * Exposed locally to allow the DB-backed fetch to call it.
+				 */
+				function updateAnsweredBadgeForTopic(tidToUpdate, answered) {
+					try {
+						const el = topicListEl.find('[component="category/topic"][data-tid="' + tidToUpdate + '"]');
+						if (!el || !el.length) return;
+						el.find('.post-answered-badge').remove();
+						if (answered) {
+							let timeEl = el.find('[component="topic/labels"] .timeago').first();
+							if (!timeEl || !timeEl.length) {
+								const headerEl = el.find('[component="topic/header"]').first();
+								if (headerEl && headerEl.length) {
+									timeEl = headerEl.parent().find('.timeago').first();
+								}
+							}
+							if (!timeEl || !timeEl.length) {
+								timeEl = el.find('.meta.teaser .timeago').first();
+							}
+							if (!timeEl || !timeEl.length) {
+								timeEl = el.find('.timeago').first();
+							}
+							if (timeEl && timeEl.length) {
+								timeEl.after('<span class="ms-2 text-success fw-bold post-answered-badge">ANSWERED</span>');
+							} else if (el.find('[component="topic/header"]').length) {
+								el.find('[component="topic/header"]').append('<span class="ms-2 text-success fw-bold post-answered-badge">ANSWERED</span>');
+							} else {
+								el.append('<span class="ms-2 text-success fw-bold post-answered-badge">ANSWERED</span>');
+							}
+						}
+					} catch (e) {
+						console.error('[topicList] updateAnsweredBadgeForTopic error', e);
+					}
+				}
+			} catch (e) {
+				console.error('Error updating topic list for answered event', e);
+			}
+		});
+
 		topicListEl = findTopicListElement();
 
 		templateName = template;
@@ -243,6 +408,39 @@ define('topicList', [
 
 			html.find('.timeago').timeago();
 			hooks.fire('action:topics.loaded', { topics: topics, template: templateName });
+
+			// Insert ANSWERED badges for topic list teasers when appropriate.
+			try {
+				topics.forEach(function (topic) {
+					if (!topic || !topic.tid) return;
+					const teaser = topic.teaser || {};
+					if (teaser.answered && teaser.answered !== '0' && teaser.answered !== 0) {
+						const topicEl = topicListEl.find('[component="category/topic"][data-tid="' + topic.tid + '"]');
+						if (!topicEl.length) return;
+						// Avoid duplicate badges
+						topicEl.find('.post-answered-badge').remove();
+						// Prefer the topic header timeago (timestamp after the title), then teaser area, then any timeago
+						let timeEl = topicEl.find('[component="topic/header"] .timeago').first();
+						if (!timeEl || !timeEl.length) {
+							timeEl = topicEl.find('.meta.teaser .timeago').first();
+						}
+						if (!timeEl || !timeEl.length) {
+							timeEl = topicEl.find('.timeago').first();
+						}
+						if (timeEl && timeEl.length) {
+							timeEl.after('<span class="ms-2 text-success fw-bold post-answered-badge">ANSWERED</span>');
+						} else if (topicEl.find('[component="topic/header"]').length) {
+							// Final fallback: append to header element
+							topicEl.find('[component="topic/header"]').append('<span class="ms-2 text-success fw-bold post-answered-badge">ANSWERED</span>');
+						} else {
+							// Very final fallback: append to the root topic element
+							topicEl.append('<span class="ms-2 text-success fw-bold post-answered-badge">ANSWERED</span>');
+						}
+					}
+				});
+			} catch (e) {
+				console.error('Error inserting answered badges in topic list', e);
+			}
 			callback();
 		});
 	}

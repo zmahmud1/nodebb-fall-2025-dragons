@@ -9,7 +9,7 @@
                 <a href="{config.relative_path}/post/{post.pid}" class="timeago text-xs text-secondary lh-1" style="vertical-align: middle;" title="{post.timestampISO}"></a>
                 {{{ if post.answered }}}
                 <span class="ms-2 text-success fw-bold post-answered-badge">ANSWERED</span>
-                {{{ end }}
+                {{{ end }}}
             </div>
         </div>
         <div class="content ghost-scrollbar" style="max-height: 300px; overflow-y:auto;">{post.content}</div>
