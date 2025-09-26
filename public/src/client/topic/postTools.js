@@ -204,6 +204,10 @@ define('forum/topic/postTools', [
 				if (labelEl.length) {
 					labelEl.text(answered ? 'Mark Unanswered' : 'Mark Answered');
 				}
+
+				// UI update will happen from the socket event handler for this topic;
+				// no immediate DOM insertion here to avoid duplicate insertions.
+
 				hooks.fire('action:post.answered.toggled', { pid: pid, answered: answered });
 			});
 		});

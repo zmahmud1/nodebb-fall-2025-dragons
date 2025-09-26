@@ -11,6 +11,7 @@ const plugins = require('../../plugins');
 const social = require('../../social');
 const user = require('../../user');
 const utils = require('../../utils');
+const websockets = require('../index');
 
 module.exports = function (SocketPosts) {
 	SocketPosts.loadPostTools = async function (socket, data) {
@@ -118,6 +119,7 @@ module.exports = function (SocketPosts) {
 		}
 
 		// read current state and toggle
+		const tid = await posts.getPostField(pid, 'tid');
 		const current = await posts.getPostField(pid, 'answered');
 		const newVal = !parseInt(current, 10);
 		// If Posts.answered helper exists, use it. Otherwise fall back to direct DB ops.
@@ -135,6 +137,15 @@ module.exports = function (SocketPosts) {
 				await db.sortedSetRemove('posts:answered', pid);
 				await db.sortedSetRemove(`tid:${tid}:answered`, pid);
 			}
+		}
+
+		// notify topic room so other clients can update in realtime
+		try {
+			if (tid) {
+				websockets.in(`topic_${tid}`).emit('event:post_answered', { pid: pid, answered: newVal });
+			}
+		} catch (e) {
+			// non-fatal
 		}
 
 		return { answered: newVal };
