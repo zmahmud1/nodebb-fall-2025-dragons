@@ -27,6 +27,9 @@ get:
                     properties:
                       pid:
                         type: number
+                      pinned:
+                        type: number
+                        description: Whether the post is pinned (1) or not (0)
                       uid:
                         type: number
                         description: A user identifier

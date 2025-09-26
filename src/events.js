@@ -28,6 +28,8 @@ events.types = [
 	'post-purge',
 	'post-edit',
 	'post-move',
+	'post-pin',
+	'post-unpin',
 	'post-change-owner',
 	'post-queue-reply-accept',
 	'post-queue-topic-accept',
