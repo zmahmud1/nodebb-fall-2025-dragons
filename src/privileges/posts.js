@@ -195,6 +195,26 @@ privsPosts.canDelete = async function (pid, uid) {
 	return { flag: flag, message: '[[error:no-privileges]]' };
 };
 
+// Who can toggle post.answered?
+// Policy: admin/mod OR topic owner OR post owner
+privsPosts.canMarkAnswered = async function (pid, uid) {
+	if (parseInt(uid, 10) <= 0) return false;
+
+	// Fast path: admin/mod in the post's category
+	if (await isAdminOrMod(pid, uid)) return true;
+
+	// Otherwise allow post owner or topic owner
+	const postFields = await posts.getPostFields(pid, ['uid', 'tid']);
+	if (!postFields) return false;
+
+	if (String(postFields.uid) === String(uid)) return true; // post owner
+
+	const topicOwnerUid = await topics.getTopicField(postFields.tid, 'uid');
+	if (String(topicOwnerUid) === String(uid)) return true; // topic owner
+
+	return false;
+};
+
 privsPosts.canFlag = async function (pid, uid) {
 	const targetUid = await posts.getPostField(pid, 'uid');
 	const [userReputation, isAdminOrModerator, targetPrivileged, reporterPrivileged] = await Promise.all([

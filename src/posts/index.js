@@ -1,14 +1,53 @@
 'use strict';
 
+const db = require('../database');
 const _ = require('lodash');
 
-const db = require('../database');
+const Posts = { answered: {} };     
+module.exports = Posts;
+require('./answered')(Posts);
+
 const utils = require('../utils');
 const user = require('../user');
 const privileges = require('../privileges');
 const plugins = require('../plugins');
 
-const Posts = module.exports;
+Posts.setAnswered = async function setAnswered(pid, answered /*, actorUid */) {
+	// These helpers are attached by ./data later — but we just *call* them at runtime,
+	// after all requires finish. It’s safe.
+	const fields = await Posts.getPostFields(pid, ['tid', 'timestamp', 'deleted', 'answered']);
+	if (!fields || !fields.tid) {
+		throw new Error('[[error:no-post]]');
+	}
+
+	const tid = Number(fields.tid);
+	const nextVal = answered ? 1 : 0;
+
+	// No-op if already in desired state
+	if (Number(fields.answered) === nextVal) {
+		return { pid: Number(pid), tid, answered: nextVal };
+	}
+
+	// Persist the flag
+	await Posts.setPostField(pid, 'answered', nextVal);
+
+	// Maintain indices
+	const score = Date.now();
+	const globalKey = 'posts:answered';
+	const topicKey = `tid:${tid}:answered`;
+
+	if (nextVal === 1 && Number(fields.deleted) !== 1) {
+		// Add to both sorted sets (use single-key helpers for compatibility with the test db mock)
+		await db.sortedSetAdd(globalKey, score, pid);
+		await db.sortedSetAdd(topicKey, score, pid);
+	} else {
+		// Remove from both indices
+		await db.sortedSetRemove(globalKey, pid);
+		await db.sortedSetRemove(topicKey, pid);
+	}
+
+	return { pid: Number(pid), tid, answered: nextVal };
+};
 
 require('./data')(Posts);
 require('./create')(Posts);
@@ -28,6 +67,7 @@ require('./diffs')(Posts);
 require('./uploads')(Posts);
 
 Posts.attachments = require('./attachments');
+
 
 Posts.exists = async function (pids) {
 	return await db.exists(

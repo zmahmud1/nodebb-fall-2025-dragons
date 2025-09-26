@@ -55,3 +55,38 @@ postsController.getRecentPosts = async function (req, res) {
 	const data = await posts.getRecentPosts(req.uid, start, stop, req.params.term);
 	res.json(data);
 };
+
+// Toggle post.answered (admin/mod/topic owner/post owner)
+postsController.toggleAnswered = async function (req, res) {
+	const pidRaw = req.params.pid;
+	const pid = utils.isNumber(pidRaw) ? parseInt(pidRaw, 10) : pidRaw;
+
+	// accept true/false, "true"/"false", 1/0, "1"/"0"
+	const raw = req.body && req.body.answered;
+	const answered = raw === true || raw === 'true' || raw === 1 || raw === '1';
+
+	if (!req.uid) {
+		throw new Error('[[error:not-logged-in]]');
+	}
+
+	const ok = await privileges.posts.canMarkAnswered(pid, req.uid);
+	if (!ok) {
+		throw new Error('[[error:no-privileges]]');
+	}
+
+	// Persist + maintain indices (requires you implemented posts.setAnswered)
+	await posts.setAnswered(pid, answered, req.uid);
+
+	const fields = await posts.getPostFields(pid, ['pid', 'tid', 'answered']);
+	const payload = {
+		pid: fields.pid,
+		tid: fields.tid,
+		answered: Number(fields.answered) === 1,
+		uid: req.uid,
+	};
+
+	// Live-update anyone on the topic page
+	require('../socket.io').in(`topic_${payload.tid}`).emit('event:post_answered_toggled', payload);
+
+	res.json({ status: 'ok', ...payload });
+};

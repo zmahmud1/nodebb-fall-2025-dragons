@@ -28,9 +28,18 @@ module.exports = function (Posts) {
 			deleted: isDeleting ? 1 : 0,
 			deleterUid: isDeleting ? uid : 0,
 		});
-		const postData = await Posts.getPostFields(pid, ['pid', 'tid', 'uid', 'content', 'timestamp', 'deleted']);
+		const postData = await Posts.getPostFields(pid, ['pid', 'tid', 'uid', 'content', 'timestamp', 'deleted', 'answered']);
 		const topicData = await topics.getTopicFields(postData.tid, ['tid', 'cid', 'pinned']);
 		postData.cid = topicData.cid;
+
+		if (Number(postData.answered) === 1) {
+			if (isDeleting) {
+				await db.sortedSetsRemove(['posts:answered', `tid:${postData.tid}:answered`], pid);
+			} else {
+				await db.sortedSetsAdd(['posts:answered', `tid:${postData.tid}:answered`], [Date.now(), Date.now()], pid);
+			}
+		}
+
 		await Promise.all([
 			topics.updateLastPostTimeFromLastPid(postData.tid),
 			topics.updateTeaser(postData.tid),
@@ -78,7 +87,7 @@ module.exports = function (Posts) {
 			deleteFromGroups(pids),
 			deleteDiffs(pids),
 			deleteFromUploads(pids),
-			db.sortedSetsRemove(['posts:pid', 'posts:votes', 'posts:flagged'], pids),
+			db.sortedSetsRemove(['posts:pid', 'posts:votes', 'posts:flagged', 'posts:answered'], pids),
 			Posts.attachments.empty(pids),
 			activitypub.notes.delete(pids),
 			db.deleteAll(pids.map(pid => `pid:${pid}:editors`)),
@@ -96,6 +105,7 @@ module.exports = function (Posts) {
 		postData.forEach((p) => {
 			bulkRemove.push([`tid:${p.tid}:posts`, p.pid]);
 			bulkRemove.push([`tid:${p.tid}:posts:votes`, p.pid]);
+			bulkRemove.push([`tid:${p.tid}:answered`, p.pid]);
 			bulkRemove.push([`uid:${p.uid}:posts`, p.pid]);
 			bulkRemove.push([`cid:${p.cid}:uid:${p.uid}:pids`, p.pid]);
 			bulkRemove.push([`cid:${p.cid}:uid:${p.uid}:pids:votes`, p.pid]);

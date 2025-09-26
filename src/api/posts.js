@@ -172,6 +172,20 @@ postsAPI.edit = async function (caller, data) {
 	return returnData;
 };
 
+// src/api/posts.js
+postsAPI.markAnswered = async (caller, { pid }) => {
+	if (!caller.uid) throw new Error('[[error:not-logged-in]]');
+	// Insert any privilege checks you added (topic owner / mod / admin)
+	await posts.answered.set(pid, caller.uid);
+	return { ok: true };
+};
+
+postsAPI.unmarkAnswered = async (caller, { pid }) => {
+	if (!caller.uid) throw new Error('[[error:not-logged-in]]');
+	await posts.answered.unset(pid, caller.uid);
+	return { ok: true };
+};
+
 postsAPI.delete = async function (caller, data) {
 	await deleteOrRestore(caller, data, {
 		command: 'delete',

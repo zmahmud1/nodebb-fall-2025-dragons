@@ -39,6 +39,9 @@ PostObject:
     pinned:
       type: number
       description: Whether the post is pinned (1) or not (0)
+    answered: 
+      type: boolean 
+      description: Whether this post has been marked as the accepted answer
     timestampISO:
       type: string
       description: An ISO 8601 formatted date string (complementing `timestamp`)
@@ -175,6 +178,8 @@ PostDataObject:
           description: A topic identifier
         content:
           type: string
+        answered: 
+          type: boolean 
         timestamp:
           type: number
         votes:

@@ -79,7 +79,7 @@ define('forum/topic/events', [
 			return $(el).closest('[data-pid]').attr('data-pid') === String(data.post.pid);
 		}).html(data.post.bookmarks).attr('data-bookmarks', data.post.bookmarks);
 	}
-
+ 
 	function onTopicPurged(data) {
 		if (
 			ajaxify.data.category &&
