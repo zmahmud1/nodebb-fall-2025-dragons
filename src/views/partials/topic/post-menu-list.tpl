@@ -140,6 +140,12 @@
 	<a class="dropdown-item rounded-1 d-flex align-items-center gap-2" component="post/flagUser" role="menuitem" href="#"><i class="fa fa-fw text-secondary fa-flag"></i> [[topic:flag-user]]</a>
 </li>
 {{{ end }}}
+<li>
+	<a class="dropdown-item rounded-1 d-flex align-items-center gap-2" component="post/mark-answered" role="menuitem" href="#" data-answered="{{{ if posts.answered }}}1{{{ else }}}0{{{ end }}}">
+		<span class="menu-icon"><i class="fa fa-fw text-secondary fa-check"></i></span>
+		<span class="mark-answered-label">{{{ if posts.answered }}}Mark Unanswered{{{ else }}}Mark Answered{{{ end }}}</span>
+	</a>
+</li>
 {{{ end }}}
 
 {{{ if posts.display_moderator_tools }}}

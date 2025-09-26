@@ -19,7 +19,7 @@ module.exports = function (SocketPosts) {
 		}
 		const cid = await posts.getCidByPid(data.pid);
 		const results = await utils.promiseParallel({
-			posts: posts.getPostFields(data.pid, ['deleted', 'bookmarks', 'uid', 'ip', 'flagId', 'url']),
+			posts: posts.getPostFields(data.pid, ['deleted', 'bookmarks', 'uid', 'ip', 'flagId', 'url', 'answered']),
 			isAdmin: user.isAdministrator(socket.uid),
 			isGlobalMod: user.isGlobalModerator(socket.uid),
 			isModerator: user.isModerator(socket.uid, cid),
@@ -104,6 +104,40 @@ module.exports = function (SocketPosts) {
 		const editorUids = await db.getSetMembers(`pid:${data.pid}:editors`);
 		const userData = await user.getUsersFields(editorUids, ['username', 'userslug', 'picture']);
 		return userData;
+	};
+
+	SocketPosts.toggleAnswered = async function (socket, data) {
+		if (!data || !data.pid) {
+			throw new Error('[[error:invalid-data]]');
+		}
+		const pid = data.pid;
+		// enforce same privilege as flagging (visibility driven by canFlag)
+		const canFlag = await privileges.posts.canFlag(pid, socket.uid);
+		if (!canFlag || !canFlag.flag) {
+			throw new Error('[[error:no-privileges]]');
+		}
+
+		// read current state and toggle
+		const current = await posts.getPostField(pid, 'answered');
+		const newVal = !parseInt(current, 10);
+		// If Posts.answered helper exists, use it. Otherwise fall back to direct DB ops.
+		if (posts.answered && typeof posts.answered.set === 'function') {
+			await posts.answered.set(pid, newVal);
+		} else {
+			// fallback: set post field and update sorted sets
+			const tid = await posts.getPostField(pid, 'tid');
+			await posts.setPostField(pid, 'answered', newVal ? 1 : 0);
+			if (newVal) {
+				const score = Date.now();
+				await db.sortedSetAdd('posts:answered', score, pid);
+				await db.sortedSetAdd(`tid:${tid}:answered`, score, pid);
+			} else {
+				await db.sortedSetRemove('posts:answered', pid);
+				await db.sortedSetRemove(`tid:${tid}:answered`, pid);
+			}
+		}
+
+		return { answered: newVal };
 	};
 
 	SocketPosts.saveEditors = async function (socket, data) {
